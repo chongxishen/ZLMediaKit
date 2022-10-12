@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
  *
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
@@ -18,46 +18,37 @@
 
 namespace mediakit {
 
-class RtmpPusher: public RtmpProtocol , public TcpClient , public PusherBase{
+class RtmpPusher : public RtmpProtocol, public toolkit::TcpClient, public PusherBase {
 public:
     typedef std::shared_ptr<RtmpPusher> Ptr;
-    RtmpPusher(const EventPoller::Ptr &poller,const RtmpMediaSource::Ptr &src);
-    virtual ~RtmpPusher();
+    RtmpPusher(const toolkit::EventPoller::Ptr &poller,const RtmpMediaSource::Ptr &src);
+    ~RtmpPusher() override;
 
-    void publish(const string &strUrl) override ;
-
+    void publish(const std::string &url) override ;
     void teardown() override;
 
-    void setOnPublished(const Event &cb) override {
-        _onPublished = cb;
-    }
-
-    void setOnShutdown(const Event &cb) override{
-        _onShutdown = cb;
-    }
 protected:
     //for Tcpclient override
-    void onRecv(const Buffer::Ptr &pBuf) override;
-    void onConnect(const SockException &err) override;
-    void onErr(const SockException &ex) override;
+    void onRecv(const toolkit::Buffer::Ptr &buf) override;
+    void onConnect(const toolkit::SockException &err) override;
+    void onErr(const toolkit::SockException &ex) override;
 
     //for RtmpProtocol override
-    void onRtmpChunk(RtmpPacket &chunkData) override;
-    void onSendRawData(const Buffer::Ptr &buffer) override{
-        send(buffer);
+    void onRtmpChunk(RtmpPacket::Ptr chunk_data) override;
+    void onSendRawData(toolkit::Buffer::Ptr buffer) override{
+        send(std::move(buffer));
     }
+
 private:
-    void onPublishResult(const SockException &ex,bool handshakeCompleted);
+    void onPublishResult_l(const toolkit::SockException &ex, bool handshake_done);
 
     template<typename FUN>
     inline void addOnResultCB(const FUN &fun) {
-        lock_guard<recursive_mutex> lck(_mtxOnResultCB);
-        _mapOnResultCB.emplace(_iReqID, fun);
+        _map_on_result.emplace(_send_req_id, fun);
     }
     template<typename FUN>
     inline void addOnStatusCB(const FUN &fun) {
-        lock_guard<recursive_mutex> lck(_mtxOnStatusCB);
-        _dqOnStatusCB.emplace_back(fun);
+        _deque_on_status.emplace_back(fun);
     }
 
     void onCmd_result(AMFDecoder &dec);
@@ -69,24 +60,21 @@ private:
     inline void send_publish();
     inline void send_metaData();
     void setSocketFlags();
-private:
-    string _strApp;
-    string _strStream;
-    string _strTcUrl;
 
-    unordered_map<int, function<void(AMFDecoder &dec)> > _mapOnResultCB;
-    recursive_mutex _mtxOnResultCB;
-    deque<function<void(AMFValue &dec)> > _dqOnStatusCB;
-    recursive_mutex _mtxOnStatusCB;
-    //超时功能实现
-    std::shared_ptr<Timer> _pPublishTimer;
-    //源
-    std::weak_ptr<RtmpMediaSource> _pMediaSrc;
-    RtmpMediaSource::RingType::RingReader::Ptr _pRtmpReader;
-    //事件监听
-    Event _onShutdown;
-    Event _onPublished;
+private:
+    std::string _app;
+    std::string _stream_id;
+    std::string _tc_url;
+    std::deque<std::function<void(AMFValue &dec)> > _deque_on_status;
+    std::unordered_map<int, std::function<void(AMFDecoder &dec)> > _map_on_result;
+
+    //推流超时定时器
+    std::shared_ptr<toolkit::Timer> _publish_timer;
+    std::weak_ptr<RtmpMediaSource> _publish_src;
+    RtmpMediaSource::RingType::RingReader::Ptr _rtmp_reader;
 };
+
+using RtmpPusherImp = PusherImp<RtmpPusher, PusherBase>;
 
 } /* namespace mediakit */
 

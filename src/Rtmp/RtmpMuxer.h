@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
  *
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
@@ -43,13 +43,13 @@ public:
     /**
      * 添加ready状态的track
      */
-    void addTrack(const Track::Ptr & track) override;
+    bool addTrack(const Track::Ptr & track) override;
 
     /**
      * 写入帧数据
      * @param frame 帧
      */
-    void inputFrame(const Frame::Ptr &frame) override;
+    bool inputFrame(const Frame::Ptr &frame) override;
 
     /**
      * 重置所有track
@@ -61,7 +61,7 @@ public:
      */
      void makeConfigPacket();
 private:
-    RtmpRing::RingType::Ptr _rtmpRing;
+    RtmpRing::RingType::Ptr _rtmp_ring;
     AMFValue _metadata;
     RtmpCodec::Ptr _encoder[TrackMax];
 };

@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
  *
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
@@ -19,20 +19,22 @@ typedef int pid_t;
 
 #include <fcntl.h>
 #include <string>
-using namespace std;
 
 class Process {
 public:
     Process();
     ~Process();
-    void run(const string &cmd,const string &log_file);
+    void run(const std::string &cmd, std::string &log_file);
     void kill(int max_delay,bool force = false);
     bool wait(bool block = true);
     int exit_code();
 private:
+    int _exit_code = 0;
     pid_t _pid = -1;
     void *_handle = nullptr;
-    int _exit_code = 0;
+#if (defined(__linux) || defined(__linux__))
+    void *_process_stack = nullptr;
+#endif
 };
 
 

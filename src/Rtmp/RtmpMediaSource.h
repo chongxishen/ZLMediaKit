@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
  *
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
@@ -28,9 +28,9 @@
 #include "Util/ResourcePool.h"
 #include "Util/NoticeCenter.h"
 #include "Thread/ThreadPool.h"
-using namespace toolkit;
 
 #define RTMP_GOP_SIZE 512
+
 namespace mediakit {
 
 /**
@@ -40,11 +40,11 @@ namespace mediakit {
  * 只要生成了这三要素，那么要实现rtmp推流、rtmp服务器就很简单了
  * rtmp推拉流协议中，先传递metadata，然后传递config帧，然后一直传递普通帧
  */
-class RtmpMediaSource : public MediaSource, public RingDelegate<RtmpPacket::Ptr>, public PacketCache<RtmpPacket>{
+class RtmpMediaSource : public MediaSource, public toolkit::RingDelegate<RtmpPacket::Ptr>, private PacketCache<RtmpPacket>{
 public:
-    typedef std::shared_ptr<RtmpMediaSource> Ptr;
-    typedef std::shared_ptr<List<RtmpPacket::Ptr> > RingDataType;
-    typedef RingBuffer<RingDataType> RingType;
+    using Ptr = std::shared_ptr<RtmpMediaSource>;
+    using RingDataType = std::shared_ptr<toolkit::List<RtmpPacket::Ptr> >;
+    using RingType = toolkit::RingBuffer<RingDataType>;
 
     /**
      * 构造函数
@@ -53,20 +53,25 @@ public:
      * @param stream_id 流id
      * @param ring_size 可以设置固定的环形缓冲大小，0则自适应
      */
-    RtmpMediaSource(const string &vhost,
-                    const string &app,
-                    const string &stream_id,
+    RtmpMediaSource(const std::string &vhost,
+                    const std::string &app,
+                    const std::string &stream_id,
                     int ring_size = RTMP_GOP_SIZE) :
             MediaSource(RTMP_SCHEMA, vhost, app, stream_id), _ring_size(ring_size) {
     }
 
-    virtual ~RtmpMediaSource() {}
+    ~RtmpMediaSource() override{}
 
     /**
      * 	获取媒体源的环形缓冲
      */
     const RingType::Ptr &getRing() const {
         return _ring;
+    }
+
+    void getPlayerList(const std::function<void(const std::list<std::shared_ptr<void>> &info_list)> &cb,
+                       const std::function<std::shared_ptr<void>(std::shared_ptr<void> &&info)> &on_change) override {
+        _ring->getInfoList(cb, on_change);
     }
 
     /**
@@ -81,7 +86,7 @@ public:
      * 获取metadata
      */
     const AMFValue &getMetaData() const {
-        lock_guard<recursive_mutex> lock(_mtx);
+        std::lock_guard<std::recursive_mutex> lock(_mtx);
         return _metadata;
     }
 
@@ -90,7 +95,7 @@ public:
      */
     template<typename FUNC>
     void getConfigFrame(const FUNC &f) {
-        lock_guard<recursive_mutex> lock(_mtx);
+        std::lock_guard<std::recursive_mutex> lock(_mtx);
         for (auto &pr : _config_frame_map) {
             f(pr.second);
         }
@@ -100,9 +105,11 @@ public:
      * 设置metadata
      */
     virtual void setMetaData(const AMFValue &metadata) {
-        lock_guard<recursive_mutex> lock(_mtx);
         _metadata = metadata;
-        if(_ring){
+        _metadata.set("server", kServerName);
+        _have_video = _metadata["videocodecid"];
+        _have_audio = _metadata["audiocodecid"];
+        if (_ring) {
             regist();
         }
     }
@@ -111,32 +118,36 @@ public:
      * 更新metadata
      */
     void updateMetaData(const AMFValue &metadata) {
-        lock_guard<recursive_mutex> lock(_mtx);
+        std::lock_guard<std::recursive_mutex> lock(_mtx);
         _metadata = metadata;
     }
 
     /**
      * 输入rtmp包
      * @param pkt rtmp包
-     * @param key 是否为关键帧
      */
-    void onWrite(const RtmpPacket::Ptr &pkt, bool key = true) override {
-        lock_guard<recursive_mutex> lock(_mtx);
-        if(pkt->typeId == MSG_VIDEO){
-            //有视频，那么启用GOP缓存
-            _have_video = true;
-        }
-        if (pkt->isCfgFrame()) {
-            _config_frame_map[pkt->typeId] = pkt;
-            return;
+    void onWrite(RtmpPacket::Ptr pkt, bool = true) override {
+        bool is_video = pkt->type_id == MSG_VIDEO;
+        _speed[is_video ? TrackVideo : TrackAudio] += pkt->size();
+        //保存当前时间戳
+        switch (pkt->type_id) {
+            case MSG_VIDEO : _track_stamps[TrackVideo] = pkt->time_stamp, _have_video = true; break;
+            case MSG_AUDIO : _track_stamps[TrackAudio] = pkt->time_stamp, _have_audio = true; break;
+            default :  break;
         }
 
-        //保存当前时间戳
-        _track_stamps_map[pkt->typeId] = pkt->timeStamp;
+        if (pkt->isCfgFrame()) {
+            std::lock_guard<std::recursive_mutex> lock(_mtx);
+            _config_frame_map[pkt->type_id] = pkt;
+            if (!_ring) {
+                //注册后收到config帧更新到各播放器
+                return;
+            }
+        }
 
         if (!_ring) {
-            weak_ptr<RtmpMediaSource> weakSelf = dynamic_pointer_cast<RtmpMediaSource>(shared_from_this());
-            auto lam = [weakSelf](const EventPoller::Ptr &, int size, bool) {
+            std::weak_ptr<RtmpMediaSource> weakSelf = std::dynamic_pointer_cast<RtmpMediaSource>(shared_from_this());
+            auto lam = [weakSelf](int size) {
                 auto strongSelf = weakSelf.lock();
                 if (!strongSelf) {
                     return;
@@ -144,63 +155,72 @@ public:
                 strongSelf->onReaderChanged(size);
             };
 
-            //rtmp包缓存最大允许512个，如果是纯视频(25fps)大概为20秒数据
-            //但是这个是GOP缓存的上限值，真实的GOP缓存大小等于两个I帧之间的包数的两倍
-            //而且每次遇到I帧，则会清空GOP缓存，所以真实的GOP缓存远小于此值
+            //GOP默认缓冲512组RTMP包，每组RTMP包时间戳相同(如果开启合并写了，那么每组为合并写时间内的RTMP包),
+            //每次遇到关键帧第一个RTMP包，则会清空GOP缓存(因为有新的关键帧了，同样可以实现秒开)
             _ring = std::make_shared<RingType>(_ring_size,std::move(lam));
-            onReaderChanged(0);
-
             if(_metadata){
                 regist();
             }
         }
-        PacketCache<RtmpPacket>::inputPacket(pkt->typeId == MSG_VIDEO, pkt, key);
+        bool key = pkt->isVideoKeyFrame();
+        auto stamp  = pkt->time_stamp;
+        PacketCache<RtmpPacket>::inputPacket(stamp, is_video, std::move(pkt), key);
     }
 
     /**
      * 获取当前时间戳
      */
     uint32_t getTimeStamp(TrackType trackType) override {
-        lock_guard<recursive_mutex> lock(_mtx);
-        switch (trackType) {
-            case TrackVideo:
-                return _track_stamps_map[MSG_VIDEO];
-            case TrackAudio:
-                return _track_stamps_map[MSG_AUDIO];
-            default:
-                return MAX(_track_stamps_map[MSG_VIDEO], _track_stamps_map[MSG_AUDIO]);
+        assert(trackType >= TrackInvalid && trackType < TrackMax);
+        if (trackType != TrackInvalid) {
+            //获取某track的时间戳
+            return _track_stamps[trackType];
         }
+
+        //获取所有track的最小时间戳
+        uint32_t ret = UINT32_MAX;
+        for (auto &stamp : _track_stamps) {
+            if (stamp > 0 && stamp < ret) {
+                ret = stamp;
+            }
+        }
+        return ret;
+    }
+
+    void clearCache() override{
+        PacketCache<RtmpPacket>::clearCache();
+        _ring->clearCache();
+    }
+
+    bool haveVideo() const {
+        return _have_video;
+    }
+
+    bool haveAudio() const {
+        return _have_audio;
     }
 
 private:
-
     /**
     * 批量flush rtmp包时触发该函数
     * @param rtmp_list rtmp包列表
     * @param key_pos 是否包含关键帧
     */
-    void onFlush(std::shared_ptr<List<RtmpPacket::Ptr> > &rtmp_list, bool key_pos) override {
+    void onFlush(std::shared_ptr<toolkit::List<RtmpPacket::Ptr> > rtmp_list, bool key_pos) override {
         //如果不存在视频，那么就没有存在GOP缓存的意义，所以is_key一直为true确保一直清空GOP缓存
-        _ring->write(rtmp_list, _have_video ? key_pos : true);
-    }
-
-    /**
-     * 每次增减消费者都会触发该函数
-     */
-    void onReaderChanged(int size) {
-        if (size == 0) {
-            onNoneReader();
-        }
+        _ring->write(std::move(rtmp_list), _have_video ? key_pos : true);
     }
 
 private:
-    int _ring_size;
     bool _have_video = false;
-    mutable recursive_mutex _mtx;
+    bool _have_audio = false;
+    int _ring_size;
+    uint32_t _track_stamps[TrackMax] = {0};
     AMFValue _metadata;
     RingType::Ptr _ring;
-    unordered_map<int, uint32_t> _track_stamps_map;
-    unordered_map<int, RtmpPacket::Ptr> _config_frame_map;
+
+    mutable std::recursive_mutex _mtx;
+    std::unordered_map<int, RtmpPacket::Ptr> _config_frame_map;
 };
 
 } /* namespace mediakit */

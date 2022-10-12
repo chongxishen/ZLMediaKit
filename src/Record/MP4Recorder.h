@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xiongziliang/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
  *
  * Use of this source code is governed by MIT license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
@@ -20,34 +20,16 @@
 #include "Util/TimeTicker.h"
 #include "Common/MediaSink.h"
 #include "MP4Muxer.h"
-using namespace toolkit;
 
 namespace mediakit {
 
-class MP4Info {
-public:
-    time_t ui64StartedTime; //GMT标准时间，单位秒
-    time_t ui64TimeLen;//录像长度，单位秒
-    off_t ui64FileSize;//文件大小，单位BYTE
-    string strFilePath;//文件路径
-    string strFileName;//文件名称
-    string strFolder;//文件夹路径
-    string strUrl;//播放路径
-    string strAppName;//应用名称
-    string strStreamId;//流ID
-    string strVhost;//vhost
-};
-
 #ifdef ENABLE_MP4
-class MP4Recorder : public MediaSinkInterface{
+class MP4Recorder : public MediaSinkInterface {
 public:
-    typedef std::shared_ptr<MP4Recorder> Ptr;
+    using Ptr = std::shared_ptr<MP4Recorder>;
 
-    MP4Recorder(const string &strPath,
-                const string &strVhost,
-                const string &strApp,
-                const string &strStreamId);
-    virtual ~MP4Recorder();
+    MP4Recorder(const std::string &path, const std::string &vhost, const std::string &app, const std::string &stream_id, size_t max_second);
+    ~MP4Recorder() override;
 
     /**
      * 重置所有Track
@@ -57,25 +39,28 @@ public:
     /**
      * 输入frame
      */
-    void inputFrame(const Frame::Ptr &frame) override;
+    bool inputFrame(const Frame::Ptr &frame) override;
 
     /**
      * 添加ready状态的track
      */
-    void addTrack(const Track::Ptr & track) override;
+    bool addTrack(const Track::Ptr & track) override;
+
 private:
     void createFile();
     void closeFile();
     void asyncClose();
+
 private:
-    string _strPath;
-    string _strFile;
-    string _strFileTmp;
-    Ticker _createFileTicker;
-    MP4Info _info;
-    bool _haveVideo = false;
+    bool _have_video = false;
+    size_t _max_second;
+    std::string _folder_path;
+    std::string _full_path;
+    std::string _full_path_tmp;
+    RecordInfo _info;
     MP4Muxer::Ptr _muxer;
-    list<Track::Ptr> _tracks;
+    std::list<Track::Ptr> _tracks;
+    uint64_t _last_dts = 0;
 };
 
 #endif ///ENABLE_MP4
