@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -14,12 +14,9 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <unordered_map>
 #include "amf.h"
 #include "Rtmp.h"
-#include "Util/util.h"
-#include "Util/logger.h"
-#include "Util/TimeTicker.h"
-#include "Network/Socket.h"
 #include "Util/ResourcePool.h"
 #include "Http/HttpRequestSplitter.h"
 
@@ -31,7 +28,8 @@ public:
     virtual ~RtmpProtocol();
 
     void onParseRtmp(const char *data, size_t size);
-    //作为客户端发送c0c1，等待s0s1s2并且回调
+    // 作为客户端发送c0c1，等待s0s1s2并且回调  [AUTO-TRANSLATED:fed23902]
+    // Send c0c1 as a client, wait for s0s1s2 and callback
     void startClientSession(const std::function<void()> &cb, bool complex = true);
 
 protected:
@@ -84,12 +82,12 @@ private:
 
 protected:
     int _send_req_id = 0;
+    int _now_stream_index = 0;
     uint32_t _stream_index = STREAM_CONTROL;
 
 private:
-    int _now_stream_index = 0;
-    int _now_chunk_id = 0;
     bool _data_started = false;
+    int _now_chunk_id = 0;
     ////////////ChunkSize////////////
     size_t _chunk_size_in = DEFAULT_CHUNK_LEN;
     size_t _chunk_size_out = DEFAULT_CHUNK_LEN;
@@ -106,7 +104,8 @@ private:
     std::function<const char * (const char *data, size_t len)> _next_step_func;
     ////////////Chunk////////////
     std::unordered_map<int, std::pair<RtmpPacket::Ptr/*now*/, RtmpPacket::Ptr/*last*/> > _map_chunk_data;
-    //循环池
+    // 循环池  [AUTO-TRANSLATED:cf2e86c5]
+    // Thread pool
     toolkit::ResourcePool<toolkit::BufferRaw> _packet_pool;
 };
 

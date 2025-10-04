@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -14,8 +14,7 @@
 #if defined(ENABLE_RTPPROXY)
 
 #include "Common/MediaSink.h"
-#include "Common/Stamp.h"
-#include "Extension/CommonRtp.h"
+#include "Rtsp/RtpCodec.h"
 
 namespace mediakit {
 
@@ -26,25 +25,35 @@ public:
 
     /**
      * 添加音视频轨道
+     * Add audio and video tracks
+     
+     * [AUTO-TRANSLATED:7b0c1d64]
      */
     bool addTrack(const Track::Ptr &track) override;
 
     /**
      * 重置音视频轨道
+     * Reset audio and video tracks
+     
+     * [AUTO-TRANSLATED:6eb1b742]
      */
     void resetTracks() override;
 
     /**
      * 输入帧数据
+     * Input frame data
+     
+     * [AUTO-TRANSLATED:d13bc7f2]
      */
     bool inputFrame(const Frame::Ptr &frame) override;
 
 protected:
-    // rtp打包后回调
+    // rtp打包后回调  [AUTO-TRANSLATED:61f5159b]
+    // Callback after RTP packaging
     virtual void onRTP(toolkit::Buffer::Ptr rtp, bool is_key = false) = 0;
 
 private:
-    RtpCodec::Ptr createRtpEncoder(const Track::Ptr &track);
+    std::shared_ptr<RtpCodec> createRtpEncoder(const Track::Ptr &track);
 
 private:
     bool _send_audio;

@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -15,16 +15,13 @@
 #include <memory>
 #include <unordered_set>
 #include <unordered_map>
-#include "Common/config.h"
 #include "RtspMediaSource.h"
-#include "Util/mini.h"
 #include "Network/Socket.h"
 
 namespace mediakit{
 
 class MultiCastAddressMaker {
 public:
-    ~MultiCastAddressMaker() {}
     static MultiCastAddressMaker& Instance();
     static bool isMultiCastAddress(uint32_t addr);
     static std::string toString(uint32_t addr);
@@ -32,7 +29,7 @@ public:
     std::shared_ptr<uint32_t> obtain(uint32_t max_try = 10);
 
 private:
-    MultiCastAddressMaker() {};
+    MultiCastAddressMaker() = default;
     void release(uint32_t addr);
 
 private:
@@ -43,18 +40,19 @@ private:
 
 class RtpMultiCaster {
 public:
-    typedef std::shared_ptr<RtpMultiCaster> Ptr;
-    typedef std::function<void()> onDetach;
+    using Ptr = std::shared_ptr<RtpMultiCaster>;
+    using onDetach = std::function<void()>;
+
     ~RtpMultiCaster();
 
-    static Ptr get(toolkit::SocketHelper &helper, const std::string &local_ip, const std::string &vhost, const std::string &app, const std::string &stream);
+    static Ptr get(toolkit::SocketHelper &helper, const std::string &local_ip, const MediaTuple &tuple, uint32_t multicast_ip = 0, uint16_t video_port = 0, uint16_t audio_port = 0);
     void setDetachCB(void *listener,const onDetach &cb);
 
     std::string getMultiCasterIP();
     uint16_t getMultiCasterPort(TrackType trackType);
 
 private:
-    RtpMultiCaster(toolkit::SocketHelper &helper, const std::string &local_ip, const std::string &vhost, const std::string &app, const std::string &stream);
+    RtpMultiCaster(toolkit::SocketHelper &helper, const std::string &local_ip, const MediaTuple &tuple, uint32_t multicast_ip, uint16_t video_port, uint16_t audio_port);
 
 private:
     std::recursive_mutex _mtx;

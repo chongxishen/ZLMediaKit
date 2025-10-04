@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -16,7 +16,7 @@ typedef struct {
     mk_http_requester requester;
 } Context;
 
-void API_CALL on_requester_complete(void *user_data, int code, const char *err_msg){
+static void API_CALL on_requester_complete(void *user_data, int code, const char *err_msg){
     Context *ctx = (Context *)user_data;
     log_debug("code: %d %s", code, err_msg);
     size_t res_len = 0;
@@ -52,7 +52,8 @@ int main(int argc, char *argv[]) {
     mk_http_requester_set_cb(requester, on_requester_complete, &ctx);
     mk_http_requester_start(requester, "http://www.baidu.com/baidu", 10);
 
-    //等待http请求完毕
+    // 等待http请求完毕  [AUTO-TRANSLATED:0c1d7dea]
+    // Wait for the HTTP request to complete
     mk_sem_wait(sem);
 
     mk_sem_release(sem);

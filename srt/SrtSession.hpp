@@ -8,10 +8,9 @@ namespace SRT {
 
 using namespace toolkit;
 
-class SrtSession : public UdpSession {
+class SrtSession : public Session {
 public:
     SrtSession(const Socket::Ptr &sock);
-    ~SrtSession() override;
 
     void onRecv(const Buffer::Ptr &) override;
     void onError(const SockException &err) override;

@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -14,11 +14,9 @@
 #include <memory>
 #include <algorithm>
 #include <functional>
-#include "Common/config.h"
 #include "RtspPlayer.h"
 #include "RtspDemuxer.h"
-#include "Poller/Timer.h"
-#include "Util/TimeTicker.h"
+#include "RtspMediaSource.h"
 
 namespace mediakit {
 
@@ -30,7 +28,7 @@ public:
     RtspPlayerImp(const toolkit::EventPoller::Ptr &poller) : Super(poller) {}
 
     ~RtspPlayerImp() override {
-        DebugL << std::endl;
+        DebugL;
     }
 
     float getProgress() const override {
@@ -57,49 +55,52 @@ public:
         seekToMilliSecond(pos);
     }
 
-    float getDuration() const override {
-        return _demuxer ? _demuxer->getDuration() : 0;
+    float getDuration() const override;
+
+    std::vector<Track::Ptr> getTracks(bool ready = true) const override;
+
+    size_t getRecvSpeed() override {
+        size_t ret = TcpClient::getRecvSpeed();
+        for (auto &rtp : _rtp_sock) {
+            if (rtp) {
+                ret += rtp->getRecvSpeed();
+            }
+        }
+        for (auto &rtcp : _rtcp_sock) {
+            if (rtcp) {
+                ret += rtcp->getRecvSpeed();
+            }
+        }
+        return ret;
     }
 
-    std::vector<Track::Ptr> getTracks(bool ready = true) const override {
-        return _demuxer ? _demuxer->getTracks(ready) : Super::getTracks(ready);
+    size_t getRecvTotalBytes() override {
+        size_t ret = TcpClient::getRecvTotalBytes();
+        for (auto &rtp : _rtp_sock) {
+            if (rtp) {
+                ret += rtp->getRecvTotalBytes();
+            }
+        }
+        for (auto &rtcp : _rtcp_sock) {
+            if (rtcp) {
+                ret += rtcp->getRecvTotalBytes();
+            }
+        }
+        return ret;
     }
 
 private:
-    //派生类回调函数
-    bool onCheckSDP(const std::string &sdp) override {
-        _rtsp_media_src = std::dynamic_pointer_cast<RtspMediaSource>(_media_src);
-        if (_rtsp_media_src) {
-            _rtsp_media_src->setSdp(sdp);
-        }
-        _demuxer = std::make_shared<RtspDemuxer>();
-        _demuxer->setTrackListener(this, (*this)[Client::kWaitTrackReady].as<bool>());
-        _demuxer->loadSdp(sdp);
-        return true;
-    }
+    // 派生类回调函数  [AUTO-TRANSLATED:61e20903]
+    // Derived class callback function
+    bool onCheckSDP(const std::string &sdp) override;
 
-    void onRecvRTP(RtpPacket::Ptr rtp, const SdpTrack::Ptr &track) override {
-        //rtp解复用时可以判断是否为关键帧起始位置
-        auto key_pos = _demuxer->inputRtp(rtp);
-        if (_rtsp_media_src) {
-            _rtsp_media_src->onWrite(std::move(rtp), key_pos);
-        }
-    }
+    void onRecvRTP(RtpPacket::Ptr rtp, const SdpTrack::Ptr &track) override;
 
-    void onPlayResult(const toolkit::SockException &ex) override {
-        if (!(*this)[Client::kWaitTrackReady].as<bool>() || ex) {
-            Super::onPlayResult(ex);
-            return;
-        }
-    }
+    void onPlayResult(const toolkit::SockException &ex) override;
 
     bool addTrack(const Track::Ptr &track) override { return true; }
 
-    void addTrackCompleted() override {
-        if ((*this)[Client::kWaitTrackReady].as<bool>()) {
-            Super::onPlayResult(toolkit::SockException(toolkit::Err_success, "play success"));
-        }
-    }
+    void addTrackCompleted() override;
 
 private:
     RtspDemuxer::Ptr _demuxer;

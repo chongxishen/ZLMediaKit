@@ -1,9 +1,9 @@
 ﻿/*
- * Copyright (c) 2016 The ZLMediaKit project authors. All Rights Reserved.
+ * Copyright (c) 2016-present The ZLMediaKit project authors. All Rights Reserved.
  *
- * This file is part of ZLMediaKit(https://github.com/xia-chu/ZLMediaKit).
+ * This file is part of ZLMediaKit(https://github.com/ZLMediaKit/ZLMediaKit).
  *
- * Use of this source code is governed by MIT license that can be found in the
+ * Use of this source code is governed by MIT-like license that can be found in the
  * LICENSE file in the root of the source tree. All contributing project authors
  * may be found in the AUTHORS file in the root of the source tree.
  */
@@ -12,20 +12,20 @@
 #define SRC_RTP_RTSPDEMUXER_H_
 
 #include <unordered_map>
-#include "Player/PlayerBase.h"
-#include "Util/TimeTicker.h"
-#include "RtpCodec.h"
+#include "Rtsp/RtpCodec.h"
+#include "Common/MediaSink.h"
 
 namespace mediakit {
 
 class RtspDemuxer : public Demuxer {
 public:
-    typedef std::shared_ptr<RtspDemuxer> Ptr;
-    RtspDemuxer() = default;
-    virtual ~RtspDemuxer() = default;
+    using Ptr = std::shared_ptr<RtspDemuxer>;
 
     /**
      * 加载sdp
+     * Load sdp
+     
+     * [AUTO-TRANSLATED:235be34f]
      */
     void loadSdp(const std::string &sdp);
 
@@ -33,12 +33,22 @@ public:
      * 开始解复用
      * @param rtp rtp包
      * @return true 代表是i帧第一个rtp包
+     * Start demultiplexing
+     * @param rtp rtp packet
+     * @return true represents the first rtp packet of the i-frame
+     
+     * [AUTO-TRANSLATED:116d3186]
      */
     bool inputRtp(const RtpPacket::Ptr &rtp);
 
     /**
      * 获取节目总时长
      * @return 节目总时长,单位秒
+     * Get the total duration of the program
+     * @return Total duration of the program, in seconds
+     
+     
+     * [AUTO-TRANSLATED:6b2ec56c]
      */
     float getDuration() const;
 
